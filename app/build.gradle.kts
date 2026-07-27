@@ -1,10 +1,27 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    check(keystorePropertiesFile.isFile) {
+        "Missing signing configuration: ${keystorePropertiesFile.path}"
+    }
+    keystorePropertiesFile.inputStream().use(::load)
+}
+
+fun keystoreProperty(name: String): String =
+    requireNotNull(keystoreProperties.getProperty(name)?.takeIf(String::isNotBlank)) {
+        "Missing '$name' in ${keystorePropertiesFile.path}"
+    }
+
 android {
-    namespace = "com.sogn.smartframe"
+    namespace = "dev.sogn.smartframe"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,20 +29,35 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.sogn.smartframe"
+        applicationId = "dev.sogn.smartframe"
         minSdk = 27
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk {
+            version = release(36)
+        }
+        versionCode = 9_000
+        versionName = "0.9.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file(keystoreProperty("storeFile"))
+            storePassword = keystoreProperty("storePassword")
+            keyAlias = keystoreProperty("keyAlias")
+            keyPassword = keystoreProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         release {
-            optimization {
-                enable = false
-            }
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
     compileOptions {
@@ -46,6 +78,11 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.analytics)
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
