@@ -3,8 +3,16 @@ package dev.sogn.smartframe
 import java.time.Instant
 import java.time.ZoneId
 
-object FrameSchedule {
+object SmartFrameSchedule {
     const val MINUTES_PER_DAY = 24 * 60
+
+    fun shouldDisplay(
+        scheduleEnabled: Boolean,
+        currentMinutes: Int,
+        startMinutes: Int,
+        endMinutes: Int,
+    ): Boolean =
+        !scheduleEnabled || isDisplayTime(currentMinutes, startMinutes, endMinutes)
 
     fun isDisplayTime(
         currentMinutes: Int,

@@ -2,4 +2,15 @@
 <resources>
 
     <style name="Theme.Frame" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.Frame.Starting" parent="Theme.SplashScreen">
+        <item name="android:windowBackground">@drawable/splash_screen</item>
+        <item name="android:windowDisablePreview">false</item>
+        <item name="android:windowIsTranslucent">false</item>
+        <item name="windowSplashScreenBackground">@color/black</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Frame</item>
+    </style>
+
+    <style name="Theme.Frame.Settings" parent="Theme.AppCompat.Light.NoActionBar" />
 </resources>

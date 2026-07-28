@@ -9,12 +9,12 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 
-object FrameScheduleManager {
+object SmartFrameScheduleManager {
     private const val ACTION_START = "dev.sogn.smartframe.action.SCHEDULE_START"
     private const val ACTION_END = "dev.sogn.smartframe.action.SCHEDULE_END"
     private const val START_REQUEST_CODE = 2001
     private const val END_REQUEST_CODE = 2002
-    private const val TAG = "FrameSchedule"
+    private const val TAG = "SmartFrameSchedule"
 
     fun sync(context: Context) {
         val appContext = context.applicationContext
@@ -24,7 +24,12 @@ object FrameScheduleManager {
         alarmManager.cancel(startIntent)
         alarmManager.cancel(endIntent)
 
-        if (!FramePreferences.isReady(appContext)) {
+        val config = SmartFramePreferences.load(appContext)
+        if (!config.scheduleEnabled) {
+            Log.i(TAG, "Schedule disabled; existing alarms canceled")
+            return
+        }
+        if (!SmartFramePreferences.isReady(appContext)) {
             Log.i(TAG, "Schedule not registered because setup is incomplete")
             return
         }
@@ -35,11 +40,10 @@ object FrameScheduleManager {
             return
         }
 
-        val config = FramePreferences.load(appContext)
         try {
             scheduleExact(
                 alarmManager,
-                FrameSchedule.nextOccurrenceMillis(
+                SmartFrameSchedule.nextOccurrenceMillis(
                     System.currentTimeMillis(),
                     config.startMinutes,
                 ),
@@ -47,7 +51,7 @@ object FrameScheduleManager {
             )
             scheduleExact(
                 alarmManager,
-                FrameSchedule.nextOccurrenceMillis(
+                SmartFrameSchedule.nextOccurrenceMillis(
                     System.currentTimeMillis(),
                     config.endMinutes,
                 ),
@@ -65,16 +69,18 @@ object FrameScheduleManager {
     }
 
     fun isDisplayTime(context: Context): Boolean {
-        val config = FramePreferences.load(context)
-        return FrameSchedule.isDisplayTime(
-            FrameSchedule.currentMinutes(),
+        val config = SmartFramePreferences.load(context)
+        return SmartFrameSchedule.shouldDisplay(
+            config.scheduleEnabled,
+            SmartFrameSchedule.currentMinutes(),
             config.startMinutes,
             config.endMinutes,
         )
     }
 
     fun applyCurrentState(context: Context) {
-        if (!FramePreferences.isReady(context)) return
+        if (!SmartFramePreferences.load(context).scheduleEnabled) return
+        if (!SmartFramePreferences.isReady(context)) return
         if (isDisplayTime(context)) {
             wakeAndOpenDisplay(context)
         } else {
@@ -84,7 +90,8 @@ object FrameScheduleManager {
 
     fun handleAlarm(context: Context, action: String?) {
         sync(context)
-        if (!FramePreferences.isReady(context)) return
+        if (!SmartFramePreferences.load(context).scheduleEnabled) return
+        if (!SmartFramePreferences.isReady(context)) return
         when (action) {
             ACTION_START -> wakeAndOpenDisplay(context)
             ACTION_END -> turnScreenOff(context)

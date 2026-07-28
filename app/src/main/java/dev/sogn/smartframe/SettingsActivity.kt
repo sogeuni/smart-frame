@@ -9,52 +9,17 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.isImeVisible
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.unit.dp
+import android.text.InputType
+import android.widget.Toast
 import androidx.core.net.toUri
-import dev.sogn.smartframe.ui.theme.FrameTheme
+import androidx.fragment.app.FragmentActivity
+import androidx.preference.EditTextPreference
+import androidx.preference.Preference
+import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.SwitchPreferenceCompat
+import java.util.Locale
 
-class SettingsActivity : ComponentActivity() {
+class SettingsActivity : FragmentActivity() {
     private val devicePolicyManager by lazy {
         getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
     }
@@ -68,80 +33,41 @@ class SettingsActivity : ComponentActivity() {
         ComponentName(this, ScreenOffAdminReceiver::class.java)
     }
 
-    private var permissionState by mutableStateOf(FramePermissionState())
-    private var statusMessage by mutableStateOf<String?>(null)
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            val savedConfig = remember { FramePreferences.load(this) }
-            val actions = remember {
-                SettingsScreenActions(
-                    onSave = ::saveConfig,
-                    onOpenDisplay = ::openDisplay,
-                    onDeviceAdminClick = ::toggleDeviceAdmin,
-                    onOverlayClick = ::requestOverlayPermission,
-                    onExactAlarmClick = ::requestExactAlarmPermission,
-                    onScreenOffTest = ::runScreenOffTest,
-                )
-            }
-            FrameTheme {
-                SettingsScreen(
-                    initialConfig = savedConfig,
-                    permissionState = permissionState,
-                    statusMessage = statusMessage,
-                    actions = actions,
-                )
-            }
+        setContentView(R.layout.activity_settings)
+        if (savedInstanceState == null) {
+            supportFragmentManager
+                .beginTransaction()
+                .replace(R.id.settings_container, SettingsFragment())
+                .commit()
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        permissionState = FramePreferences.permissionState(this)
-        FrameScheduleManager.sync(this)
+    override fun onStop() {
+        super.onStop()
+        if (isFinishing) {
+            SmartFrameScheduleManager.applyCurrentState(applicationContext)
+        }
     }
 
-    private fun saveConfig(url: String, startMinutes: Int, endMinutes: Int): Boolean {
-        val normalizedUrl = FramePreferences.normalizeUrl(url)
-        if (normalizedUrl == null) {
-            statusMessage = getString(R.string.invalid_url)
-            return false
-        }
-        if (startMinutes == endMinutes) {
-            statusMessage = getString(R.string.invalid_schedule)
-            return false
-        }
-        FramePreferences.save(
-            this,
-            FrameConfig(
-                url = normalizedUrl,
-                startMinutes = startMinutes,
-                endMinutes = endMinutes,
-            ),
-        )
-        FrameScheduleManager.sync(this)
-        statusMessage = getString(R.string.settings_saved)
-        return true
-    }
-
-    private fun openDisplay(url: String, startMinutes: Int, endMinutes: Int) {
-        if (!saveConfig(url, startMinutes, endMinutes)) return
-        permissionState = FramePreferences.permissionState(this)
-        if (!permissionState.allRequiredGranted) {
-            statusMessage = getString(R.string.required_permissions_missing)
+    internal fun openDisplay() {
+        if (!SmartFramePreferences.isReady(this)) {
+            showMessage(R.string.required_permissions_missing)
             return
         }
         startActivity(Intent(this, MainActivity::class.java))
         finish()
     }
 
-    private fun toggleDeviceAdmin() {
+    internal fun toggleDeviceAdmin() {
+        val permissionState = SmartFramePreferences.permissionState(this)
         if (permissionState.deviceAdminActive) {
             devicePolicyManager.removeActiveAdmin(adminComponent)
-            permissionState = FramePreferences.permissionState(this)
-            FrameScheduleManager.sync(this)
+            updateDeviceAdminSummary()
+            window.decorView.post {
+                SmartFrameScheduleManager.sync(this)
+            }
             return
         }
         startActivity(
@@ -155,7 +81,7 @@ class SettingsActivity : ComponentActivity() {
         )
     }
 
-    private fun requestOverlayPermission() {
+    internal fun requestOverlayPermission() {
         startActivity(
             Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -164,7 +90,7 @@ class SettingsActivity : ComponentActivity() {
         )
     }
 
-    private fun requestExactAlarmPermission() {
+    internal fun requestExactAlarmPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             startActivity(
                 Intent(
@@ -175,17 +101,17 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
-    private fun runScreenOffTest() {
-        permissionState = FramePreferences.permissionState(this)
+    internal fun runScreenOffTest() {
+        val permissionState = SmartFramePreferences.permissionState(this)
         if (!permissionState.deviceAdminActive ||
             (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                 !alarmManager.canScheduleExactAlarms())
         ) {
-            statusMessage = getString(R.string.screen_test_permissions_missing)
+            showMessage(R.string.screen_test_permissions_missing)
             return
         }
         if (keyguardManager.isDeviceSecure) {
-            statusMessage = getString(R.string.remove_screen_lock)
+            showMessage(R.string.remove_screen_lock)
             return
         }
 
@@ -196,15 +122,25 @@ class SettingsActivity : ComponentActivity() {
                 System.currentTimeMillis() + WAKE_DELAY_MILLIS,
                 wakeIntent,
             )
-            statusMessage = getString(R.string.screen_off_scheduled)
+            showMessage(R.string.screen_off_scheduled)
             devicePolicyManager.lockNow()
         } catch (error: RuntimeException) {
             alarmManager.cancel(wakeIntent)
-            statusMessage = getString(
-                R.string.screen_off_failed,
-                error.message.orEmpty(),
-            )
+            Toast.makeText(
+                this,
+                getString(R.string.screen_off_failed, error.message.orEmpty()),
+                Toast.LENGTH_LONG,
+            ).show()
         }
+    }
+
+    internal fun showMessage(messageResId: Int) {
+        Toast.makeText(this, messageResId, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun updateDeviceAdminSummary() {
+        (supportFragmentManager.findFragmentById(R.id.settings_container) as? SettingsFragment)
+            ?.updateDeviceAdminSummary()
     }
 
     companion object {
@@ -213,210 +149,187 @@ class SettingsActivity : ComponentActivity() {
     }
 }
 
-private class SettingsScreenActions(
-    val onSave: (String, Int, Int) -> Boolean,
-    val onOpenDisplay: (String, Int, Int) -> Unit,
-    val onDeviceAdminClick: () -> Unit,
-    val onOverlayClick: () -> Unit,
-    val onExactAlarmClick: () -> Unit,
-    val onScreenOffTest: () -> Unit,
-)
+class SettingsFragment : PreferenceFragmentCompat() {
+    private lateinit var urlPreference: EditTextPreference
+    private lateinit var schedulePreference: SwitchPreferenceCompat
+    private lateinit var startTimePreference: Preference
+    private lateinit var endTimePreference: Preference
+    private lateinit var deviceAdminPreference: Preference
+    private lateinit var overlayPreference: Preference
+    private lateinit var exactAlarmPreference: Preference
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SettingsScreen(
-    initialConfig: FrameConfig,
-    permissionState: FramePermissionState,
-    statusMessage: String?,
-    actions: SettingsScreenActions,
-) {
-    var url by rememberSaveable { mutableStateOf(initialConfig.url) }
-    var startMinutes by rememberSaveable { mutableIntStateOf(initialConfig.startMinutes) }
-    var endMinutes by rememberSaveable { mutableIntStateOf(initialConfig.endMinutes) }
-    var localMessage by rememberSaveable { mutableStateOf<String?>(null) }
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val isImeVisible = WindowInsets.isImeVisible
-    val dismissKeyboard = {
-        focusManager.clearFocus(force = true)
-        keyboardController?.hide()
+    private val host: SettingsActivity
+        get() = requireActivity() as SettingsActivity
+
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        setPreferencesFromResource(R.xml.preferences, rootKey)
+
+        urlPreference = requirePreference(SmartFramePreferences.KEY_URL)
+        schedulePreference = requirePreference(SmartFramePreferences.KEY_SCHEDULE_ENABLED)
+        startTimePreference = requirePreference(SmartFramePreferences.KEY_START_MINUTES)
+        endTimePreference = requirePreference(SmartFramePreferences.KEY_END_MINUTES)
+        deviceAdminPreference = requirePreference(KEY_DEVICE_ADMIN)
+        overlayPreference = requirePreference(KEY_OVERLAY)
+        exactAlarmPreference = requirePreference(KEY_EXACT_ALARM)
+
+        bindUrlPreference()
+        bindSchedulePreference()
+        bindTimePreferences()
+        bindPermissionPreferences()
+        requirePreference<Preference>(KEY_SCREEN_OFF_TEST).setOnPreferenceClickListener {
+            host.runScreenOffTest()
+            true
+        }
+        requirePreference<Preference>(KEY_OPEN_DISPLAY).setOnPreferenceClickListener {
+            host.openDisplay()
+            true
+        }
+        refreshState()
     }
 
-    BackHandler(enabled = isImeVisible) {
-        dismissKeyboard()
+    override fun onResume() {
+        super.onResume()
+        refreshState()
+        SmartFrameScheduleManager.sync(requireContext())
     }
 
-    FrameTheme {
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(focusManager, keyboardController) {
-                    detectTapGestures(onTap = { dismissKeyboard() })
-                },
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 48.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(
-                    text = androidx.compose.ui.res.stringResource(R.string.settings_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                )
-                Text(
-                    text = androidx.compose.ui.res.stringResource(R.string.website_section),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(androidx.compose.ui.res.stringResource(R.string.website_url)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(
-                        onDone = { dismissKeyboard() },
-                    ),
-                )
+    internal fun refreshState() {
+        if (!this::urlPreference.isInitialized) return
 
-                HorizontalDivider()
-                Text(
-                    text = androidx.compose.ui.res.stringResource(R.string.schedule_section),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                TimeSettingRow(
-                    label = androidx.compose.ui.res.stringResource(R.string.start_time),
-                    minutes = startMinutes,
-                    onTimeChanged = { startMinutes = it },
-                )
-                TimeSettingRow(
-                    label = androidx.compose.ui.res.stringResource(R.string.end_time),
-                    minutes = endMinutes,
-                    onTimeChanged = { endMinutes = it },
-                )
+        val config = SmartFramePreferences.load(requireContext())
+        urlPreference.text = config.url
+        schedulePreference.isChecked = config.scheduleEnabled
+        startTimePreference.summary = formatTime(config.startMinutes)
+        endTimePreference.summary = formatTime(config.endMinutes)
 
-                HorizontalDivider()
-                Text(
-                    text = androidx.compose.ui.res.stringResource(R.string.permissions_section),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                PermissionRow(
-                    title = androidx.compose.ui.res.stringResource(R.string.screen_off_permission),
-                    granted = permissionState.deviceAdminActive,
-                    supported = permissionState.deviceAdminSupported,
-                    onClick = actions.onDeviceAdminClick,
-                )
-                PermissionRow(
-                    title = androidx.compose.ui.res.stringResource(R.string.overlay_permission),
-                    granted = permissionState.overlayGranted,
-                    onClick = actions.onOverlayClick,
-                )
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    PermissionRow(
-                        title = androidx.compose.ui.res.stringResource(R.string.exact_alarm_permission),
-                        granted = permissionState.exactAlarmGranted,
-                        onClick = actions.onExactAlarmClick,
-                    )
-                }
-                Button(
-                    onClick = actions.onScreenOffTest,
-                    enabled = permissionState.deviceAdminActive &&
-                        permissionState.exactAlarmGranted,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(androidx.compose.ui.res.stringResource(R.string.turn_off_for_ten_seconds))
-                }
+        val permissionState = SmartFramePreferences.permissionState(requireContext())
+        deviceAdminPreference.isEnabled = permissionState.deviceAdminSupported
+        deviceAdminPreference.summary = permissionSummary(
+            granted = permissionState.deviceAdminActive,
+            supported = permissionState.deviceAdminSupported,
+        )
+        overlayPreference.summary = permissionSummary(permissionState.overlayGranted)
+        exactAlarmPreference.isVisible = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        exactAlarmPreference.summary = permissionSummary(permissionState.exactAlarmGranted)
+    }
 
-                (localMessage ?: statusMessage)?.let {
-                    Text(text = it, color = MaterialTheme.colorScheme.primary)
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        localMessage = if (actions.onSave(url, startMinutes, endMinutes)) {
-                            null
-                        } else {
-                            localMessage
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(androidx.compose.ui.res.stringResource(R.string.save_settings))
-                }
-                Button(
-                    onClick = { actions.onOpenDisplay(url, startMinutes, endMinutes) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(androidx.compose.ui.res.stringResource(R.string.open_frame_display))
-                }
+    internal fun updateDeviceAdminSummary() {
+        if (!this::deviceAdminPreference.isInitialized) return
+        deviceAdminPreference.summary = permissionSummary(granted = false)
+    }
+
+    private fun bindUrlPreference() {
+        urlPreference.isPersistent = false
+        urlPreference.summaryProvider = EditTextPreference.SimpleSummaryProvider.getInstance()
+        urlPreference.setOnBindEditTextListener { editText ->
+            editText.inputType =
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            editText.setSelectAllOnFocus(false)
+        }
+        urlPreference.setOnPreferenceChangeListener { _, newValue ->
+            val normalizedUrl = SmartFramePreferences.normalizeUrl(newValue as String)
+            if (normalizedUrl == null) {
+                host.showMessage(R.string.invalid_url)
+                return@setOnPreferenceChangeListener false
             }
+
+            val config = SmartFramePreferences.load(requireContext())
+            SmartFramePreferences.save(requireContext(), config.copy(url = normalizedUrl))
+            urlPreference.text = normalizedUrl
+            false
         }
     }
-}
 
-@Composable
-private fun TimeSettingRow(
-    label: String,
-    minutes: Int,
-    onTimeChanged: (Int) -> Unit,
-) {
-    val context = LocalContext.current
-    val locale = LocalConfiguration.current.locales[0]
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label)
-        Button(
-            onClick = {
-                TimePickerDialog(
-                    context,
-                    { _, hour, minute -> onTimeChanged(hour * 60 + minute) },
-                    minutes / 60,
-                    minutes % 60,
-                    true,
-                ).show()
-            },
-        ) {
-            Text(String.format(locale, "%02d:%02d", minutes / 60, minutes % 60))
+    private fun bindSchedulePreference() {
+        schedulePreference.isPersistent = false
+        schedulePreference.setOnPreferenceChangeListener { _, newValue ->
+            val enabled = newValue as Boolean
+            val config = SmartFramePreferences.load(requireContext())
+            SmartFramePreferences.save(requireContext(), config.copy(scheduleEnabled = enabled))
+            schedulePreference.isChecked = enabled
+            SmartFrameScheduleManager.sync(requireContext())
+            true
         }
     }
-}
 
-@Composable
-private fun PermissionRow(
-    title: String,
-    granted: Boolean,
-    supported: Boolean = true,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title)
-            Text(
-                text = when {
-                    !supported -> androidx.compose.ui.res.stringResource(R.string.not_supported)
-                    granted -> androidx.compose.ui.res.stringResource(R.string.permission_granted)
-                    else -> androidx.compose.ui.res.stringResource(R.string.permission_not_granted)
-                },
-                style = MaterialTheme.typography.bodySmall,
-            )
+    private fun bindTimePreferences() {
+        startTimePreference.isPersistent = false
+        endTimePreference.isPersistent = false
+        startTimePreference.setOnPreferenceClickListener {
+            showTimePicker(isStartTime = true)
+            true
         }
-        Button(onClick = onClick, enabled = supported) {
-            Text(
-                if (granted) {
-                    androidx.compose.ui.res.stringResource(R.string.disable_permission)
+        endTimePreference.setOnPreferenceClickListener {
+            showTimePicker(isStartTime = false)
+            true
+        }
+    }
+
+    private fun bindPermissionPreferences() {
+        deviceAdminPreference.setOnPreferenceClickListener {
+            host.toggleDeviceAdmin()
+            true
+        }
+        overlayPreference.setOnPreferenceClickListener {
+            host.requestOverlayPermission()
+            true
+        }
+        exactAlarmPreference.setOnPreferenceClickListener {
+            host.requestExactAlarmPermission()
+            true
+        }
+    }
+
+    private fun showTimePicker(isStartTime: Boolean) {
+        val config = SmartFramePreferences.load(requireContext())
+        val currentMinutes = if (isStartTime) config.startMinutes else config.endMinutes
+        TimePickerDialog(
+            requireContext(),
+            { _, hour, minute ->
+                val selectedMinutes = hour * 60 + minute
+                val otherMinutes = if (isStartTime) config.endMinutes else config.startMinutes
+                if (selectedMinutes == otherMinutes) {
+                    host.showMessage(R.string.invalid_schedule)
+                    return@TimePickerDialog
+                }
+
+                val updatedConfig = if (isStartTime) {
+                    config.copy(startMinutes = selectedMinutes)
                 } else {
-                    androidx.compose.ui.res.stringResource(R.string.enable_permission)
-                },
-            )
+                    config.copy(endMinutes = selectedMinutes)
+                }
+                SmartFramePreferences.save(requireContext(), updatedConfig)
+                refreshState()
+                SmartFrameScheduleManager.sync(requireContext())
+            },
+            currentMinutes / 60,
+            currentMinutes % 60,
+            true,
+        ).show()
+    }
+
+    private fun permissionSummary(granted: Boolean, supported: Boolean = true): String =
+        getString(
+            when {
+                !supported -> R.string.not_supported
+                granted -> R.string.permission_granted
+                else -> R.string.permission_not_granted
+            },
+        )
+
+    private fun formatTime(minutes: Int): String =
+        String.format(Locale.getDefault(), "%02d:%02d", minutes / 60, minutes % 60)
+
+    private inline fun <reified T : Preference> requirePreference(key: String): T =
+        requireNotNull(findPreference<T>(key)) {
+            "Missing preference: $key"
         }
+
+    private companion object {
+        const val KEY_DEVICE_ADMIN = "device_admin"
+        const val KEY_OVERLAY = "overlay"
+        const val KEY_EXACT_ALARM = "exact_alarm"
+        const val KEY_SCREEN_OFF_TEST = "screen_off_test"
+        const val KEY_OPEN_DISPLAY = "open_display"
     }
 }

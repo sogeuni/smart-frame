@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory app:title="@string/website_section">
+        <EditTextPreference
+            app:key="url"
+            app:dialogTitle="@string/website_url"
+            app:title="@string/website_url" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/schedule_section">
+        <SwitchPreferenceCompat
+            app:key="schedule_enabled"
+            app:summary="@string/schedule_enabled_summary"
+            app:title="@string/schedule_enabled" />
+
+        <Preference
+            app:key="start_minutes"
+            app:dependency="schedule_enabled"
+            app:title="@string/start_time" />
+
+        <Preference
+            app:key="end_minutes"
+            app:dependency="schedule_enabled"
+            app:title="@string/end_time" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/permissions_section">
+        <Preference
+            app:key="device_admin"
+            app:title="@string/screen_off_permission" />
+
+        <Preference
+            app:key="overlay"
+            app:title="@string/overlay_permission" />
+
+        <Preference
+            app:key="exact_alarm"
+            app:title="@string/exact_alarm_permission" />
+
+        <Preference
+            app:key="screen_off_test"
+            app:title="@string/turn_off_for_ten_seconds" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/display_section">
+        <Preference
+            app:key="open_display"
+            app:summary="@string/open_frame_display_summary"
+            app:title="@string/open_frame_display" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

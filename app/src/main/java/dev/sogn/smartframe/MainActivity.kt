@@ -20,6 +20,7 @@ import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -34,7 +35,11 @@ import org.mozilla.geckoview.GeckoView
 class MainActivity : ComponentActivity() {
     private var geckoView: GeckoView? = null
     private var geckoSession: GeckoSession? = null
+    private var webContentReady = false
     private var settingsButton: Button? = null
+    private val releaseSplashScreen = Runnable {
+        webContentReady = true
+    }
     private val hideSettingsButton = Runnable {
         settingsButton?.visibility = View.GONE
     }
@@ -70,37 +75,42 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition { !webContentReady }
         super.onCreate(savedInstanceState)
 
-        if (!FramePreferences.isReady(this)) {
+        if (!SmartFramePreferences.isReady(this)) {
+            markWebContentReady()
             openSettings()
             return
         }
 
+        window.decorView.postDelayed(releaseSplashScreen, SPLASH_MAX_DURATION_MILLIS)
         setShowWhenLocked(true)
         setTurnScreenOn(true)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         showImmersiveMode()
-        showGeckoView(FramePreferences.load(this).url)
+        showGeckoView(SmartFramePreferences.load(this).url)
         registerScreenOnReceiver()
     }
 
     override fun onResume() {
         super.onResume()
-        if (!FramePreferences.isReady(this)) {
+        if (!SmartFramePreferences.isReady(this)) {
             if (!isFinishing) {
                 openSettings()
             }
             return
         }
 
-        FrameScheduleManager.sync(this)
+        SmartFrameScheduleManager.sync(this)
         showImmersiveMode()
     }
 
     override fun onStart() {
         super.onStart()
+        geckoSession?.setActive(true)
         if (geckoSession == null || networkCallbackRegistered) return
 
         networkLevel = currentNetworkLevel()
@@ -109,6 +119,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        geckoSession?.setActive(false)
         if (networkCallbackRegistered) {
             connectivityManager.unregisterNetworkCallback(networkCallback)
             networkCallbackRegistered = false
@@ -133,6 +144,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         settingsButton?.removeCallbacks(hideSettingsButton)
         settingsButton = null
+        window.decorView.removeCallbacks(releaseSplashScreen)
         if (screenOnReceiverRegistered) {
             unregisterReceiver(screenOnReceiver)
             screenOnReceiverRegistered = false
@@ -163,6 +175,7 @@ class MainActivity : ComponentActivity() {
             GeckoSession(
                 GeckoSessionSettings.Builder()
                     .allowJavascript(true)
+                    .suspendMediaWhenInactive(true)
                     .build(),
             ).apply {
                 navigationDelegate =
@@ -198,11 +211,15 @@ class MainActivity : ComponentActivity() {
                                 },
                             )
                     }
-                contentDelegate = object : GeckoSession.ContentDelegate {}
+                contentDelegate =
+                    object : GeckoSession.ContentDelegate {
+                        override fun onFirstContentfulPaint(session: GeckoSession) {
+                            markWebContentReady()
+                        }
+                    }
                 open(getGeckoRuntime())
             }
         browser.setSession(session)
-        session.loadUri(url)
         val button = Button(this).apply {
             text = getString(R.string.open_settings)
             alpha = SETTINGS_BUTTON_ALPHA
@@ -231,6 +248,12 @@ class MainActivity : ComponentActivity() {
         geckoSession = session
         settingsButton = button
         setContentView(container)
+        session.loadUri(url)
+    }
+
+    private fun markWebContentReady() {
+        webContentReady = true
+        window.decorView.removeCallbacks(releaseSplashScreen)
     }
 
     private fun getGeckoRuntime(): GeckoRuntime =
@@ -308,6 +331,7 @@ class MainActivity : ComponentActivity() {
         const val SETTINGS_BUTTON_VISIBLE_MILLIS = 5_000L
         const val SETTINGS_BUTTON_ALPHA = 0.65f
         const val SETTINGS_BUTTON_MARGIN_DP = 24
+        const val SPLASH_MAX_DURATION_MILLIS = 30_000L
 
         var geckoRuntime: GeckoRuntime? = null
     }
