@@ -6,6 +6,6 @@ import android.content.Intent
 
 class ScheduleAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        FrameScheduleManager.handleAlarm(context, intent.action)
+        SmartFrameScheduleManager.handleAlarm(context, intent.action)
     }
 }

@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (!FramePreferences.isReady(this)) {
+        if (!SmartFramePreferences.isReady(this)) {
             openSettings()
             return
         }
@@ -81,20 +81,20 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         showImmersiveMode()
-        showWebView(FramePreferences.load(this).url)
+        showWebView(SmartFramePreferences.load(this).url)
         registerScreenOnReceiver()
     }
 
     override fun onResume() {
         super.onResume()
-        if (!FramePreferences.isReady(this)) {
+        if (!SmartFramePreferences.isReady(this)) {
             if (!isFinishing) {
                 openSettings()
             }
             return
         }
 
-        FrameScheduleManager.sync(this)
+        SmartFrameScheduleManager.sync(this)
         showImmersiveMode()
     }
 

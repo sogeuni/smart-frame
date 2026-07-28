@@ -35,7 +35,7 @@
             android:name=".SettingsActivity"
             android:exported="false"
             android:label="@string/settings_app_name"
-            android:theme="@style/Theme.Frame"
+            android:theme="@style/Theme.Frame.Settings"
             android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
 
         <receiver
