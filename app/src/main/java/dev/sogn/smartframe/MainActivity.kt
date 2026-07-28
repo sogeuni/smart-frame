@@ -41,13 +41,28 @@ class MainActivity : ComponentActivity() {
         getSystemService(ConnectivityManager::class.java)
     }
     private var networkCallbackRegistered = false
-    private var screenOnReceiverRegistered = false
+    private var screenStateReceiverRegistered = false
+    private var activityStarted = false
+    private var webContentPaused = false
+    private var reloadWhenStarted = false
     private var networkLevel = NETWORK_UNAVAILABLE
-    private val screenOnReceiver = object : BroadcastReceiver() {
+    private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_SCREEN_ON) {
-                Log.i(TAG, "Screen turned on; reloading WebView")
-                webView?.post { webView?.reload() }
+            when (intent.action) {
+                Intent.ACTION_SCREEN_OFF -> {
+                    reloadWhenStarted = true
+                    webView?.post(::pauseWebContent)
+                }
+
+                Intent.ACTION_SCREEN_ON -> {
+                    if (activityStarted && reloadWhenStarted) {
+                        webView?.post {
+                            resumeWebContent()
+                            webView?.reload()
+                            reloadWhenStarted = false
+                        }
+                    }
+                }
             }
         }
     }
@@ -82,7 +97,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         showImmersiveMode()
         showWebView(SmartFramePreferences.load(this).url)
-        registerScreenOnReceiver()
+        registerScreenStateReceiver()
     }
 
     override fun onResume() {
@@ -100,7 +115,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (webView == null || networkCallbackRegistered) return
+        activityStarted = true
+        resumeWebContent()
+        if (reloadWhenStarted) {
+            webView?.reload()
+            reloadWhenStarted = false
+        }
+        if (webView == null) return
+        if (networkCallbackRegistered) return
 
         networkLevel = currentNetworkLevel()
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
@@ -108,6 +130,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        activityStarted = false
+        pauseWebContent()
         if (networkCallbackRegistered) {
             connectivityManager.unregisterNetworkCallback(networkCallback)
             networkCallbackRegistered = false
@@ -132,9 +156,13 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         settingsButton?.removeCallbacks(hideSettingsButton)
         settingsButton = null
-        if (screenOnReceiverRegistered) {
-            unregisterReceiver(screenOnReceiver)
-            screenOnReceiverRegistered = false
+        if (screenStateReceiverRegistered) {
+            unregisterReceiver(screenStateReceiver)
+            screenStateReceiverRegistered = false
+        }
+        if (webContentPaused) {
+            webView?.resumeTimers()
+            webContentPaused = false
         }
         webView?.apply {
             stopLoading()
@@ -217,6 +245,26 @@ class MainActivity : ComponentActivity() {
         setContentView(container)
     }
 
+    private fun pauseWebContent() {
+        if (webContentPaused) return
+        webView?.apply {
+            onPause()
+            pauseTimers()
+            webContentPaused = true
+            Log.i(TAG, "WebView rendering paused")
+        }
+    }
+
+    private fun resumeWebContent() {
+        if (!webContentPaused) return
+        webView?.apply {
+            onResume()
+            resumeTimers()
+            webContentPaused = false
+            Log.i(TAG, "WebView rendering resumed")
+        }
+    }
+
     private fun showSettingsButton() {
         settingsButton?.apply {
             removeCallbacks(hideSettingsButton)
@@ -233,23 +281,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun registerScreenOnReceiver() {
-        if (screenOnReceiverRegistered) return
+    private fun registerScreenStateReceiver() {
+        if (screenStateReceiverRegistered) return
         ContextCompat.registerReceiver(
             this,
-            screenOnReceiver,
-            IntentFilter(Intent.ACTION_SCREEN_ON),
+            screenStateReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+            },
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
-        screenOnReceiverRegistered = true
+        screenStateReceiverRegistered = true
     }
 
     private fun handleNetworkChange() {
         runOnUiThread {
             val newLevel = currentNetworkLevel()
-            val shouldReload =
-                (networkLevel == NETWORK_UNAVAILABLE && newLevel > NETWORK_UNAVAILABLE) ||
-                    (networkLevel < NETWORK_VALIDATED && newLevel == NETWORK_VALIDATED)
+            val becameAvailable =
+                (networkLevel == NETWORK_UNAVAILABLE) && (newLevel > NETWORK_UNAVAILABLE)
+            val becameValidated =
+                (networkLevel < NETWORK_VALIDATED) && (newLevel == NETWORK_VALIDATED)
+            val shouldReload = becameAvailable || becameValidated
             networkLevel = newLevel
 
             if (shouldReload) {
