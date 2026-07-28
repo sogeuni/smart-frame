@@ -34,6 +34,10 @@ android {
         targetSdk {
             version = release(36)
         }
+        ndk {
+            //noinspection ChromeOsAbiSupport
+            abiFilters += "arm64-v8a"
+        }
         versionCode = 9_000
         versionName = "0.9.0"
 
@@ -78,6 +82,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.mozilla.geckoview)
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.crashlytics)

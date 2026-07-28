@@ -11,6 +11,7 @@ kotlin = "2.4.10"
 composeBom = "2026.06.01"
 gms = "4.5.0"
 crashlytics = "3.0.7"
+geckoview = "153.0.20260715202819"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -30,6 +31,7 @@ firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+mozilla-geckoview = { module = "org.mozilla.geckoview:geckoview-arm64-v8a", version.ref = "geckoview" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

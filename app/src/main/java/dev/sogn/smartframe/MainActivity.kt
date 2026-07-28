@@ -1,38 +1,39 @@
 package dev.sogn.smartframe
 
-import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
-import android.net.Uri
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.webkit.SslErrorHandler
-import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.core.content.ContextCompat
-import android.net.http.SslError
-import androidx.core.net.toUri
+import org.mozilla.geckoview.AllowOrDeny
+import org.mozilla.geckoview.GeckoResult
+import org.mozilla.geckoview.GeckoRuntime
+import org.mozilla.geckoview.GeckoRuntimeSettings
+import org.mozilla.geckoview.GeckoSession
+import org.mozilla.geckoview.GeckoSessionSettings
+import org.mozilla.geckoview.GeckoView
 
 class MainActivity : ComponentActivity() {
-    private var webView: WebView? = null
+    private var geckoView: GeckoView? = null
+    private var geckoSession: GeckoSession? = null
     private var settingsButton: Button? = null
     private val hideSettingsButton = Runnable {
         settingsButton?.visibility = View.GONE
@@ -46,8 +47,8 @@ class MainActivity : ComponentActivity() {
     private val screenOnReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_SCREEN_ON) {
-                Log.i(TAG, "Screen turned on; reloading WebView")
-                webView?.post { webView?.reload() }
+                Log.i(TAG, "Screen turned on; reloading GeckoView")
+                geckoView?.post { geckoSession?.reload() }
             }
         }
     }
@@ -81,7 +82,7 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         showImmersiveMode()
-        showWebView(FramePreferences.load(this).url)
+        showGeckoView(FramePreferences.load(this).url)
         registerScreenOnReceiver()
     }
 
@@ -100,7 +101,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (webView == null || networkCallbackRegistered) return
+        if (geckoSession == null || networkCallbackRegistered) return
 
         networkLevel = currentNetworkLevel()
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
@@ -123,7 +124,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_DOWN && webView != null) {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN && geckoSession != null) {
             showSettingsButton()
         }
         return super.dispatchTouchEvent(event)
@@ -136,14 +137,11 @@ class MainActivity : ComponentActivity() {
             unregisterReceiver(screenOnReceiver)
             screenOnReceiverRegistered = false
         }
-        webView?.apply {
-            stopLoading()
-            loadUrl("about:blank")
-            clearHistory()
-            removeAllViews()
-            destroy()
-        }
-        webView = null
+        geckoSession?.stop()
+        geckoView?.releaseSession()
+        geckoSession?.close()
+        geckoSession = null
+        geckoView = null
         super.onDestroy()
     }
 
@@ -155,39 +153,56 @@ class MainActivity : ComponentActivity() {
         finish()
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun showWebView(url: String) {
+    private fun showGeckoView(url: String) {
         val container = FrameLayout(this)
-        val browser = WebView(this).apply {
+        val browser = GeckoView(this).apply {
             setBackgroundColor(Color.BLACK)
             keepScreenOn = true
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                mediaPlaybackRequiresUserGesture = false
-                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                cacheMode = WebSettings.LOAD_DEFAULT
-            }
-            webViewClient = object : WebViewClient() {
-                override fun shouldOverrideUrlLoading(
-                    view: WebView,
-                    request: WebResourceRequest,
-                ): Boolean = !request.url.isHttps()
-
-                @Suppress("OVERRIDE_DEPRECATION")
-                override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
-                    !url.toUri().isHttps()
-
-                override fun onReceivedSslError(
-                    view: WebView,
-                    handler: SslErrorHandler,
-                    error: SslError,
-                ) {
-                    handler.cancel()
-                }
-            }
-            loadUrl(url)
         }
+        val session =
+            GeckoSession(
+                GeckoSessionSettings.Builder()
+                    .allowJavascript(true)
+                    .build(),
+            ).apply {
+                navigationDelegate =
+                    object : GeckoSession.NavigationDelegate {
+                        override fun onLoadRequest(
+                            session: GeckoSession,
+                            request: GeckoSession.NavigationDelegate.LoadRequest,
+                        ): GeckoResult<AllowOrDeny> =
+                            GeckoResult.fromValue(
+                                if (request.uri.toUri().isHttps()) {
+                                    AllowOrDeny.ALLOW
+                                } else {
+                                    AllowOrDeny.DENY
+                                },
+                            )
+                    }
+                permissionDelegate =
+                    object : GeckoSession.PermissionDelegate {
+                        override fun onContentPermissionRequest(
+                            session: GeckoSession,
+                            permission: GeckoSession.PermissionDelegate.ContentPermission,
+                        ): GeckoResult<Int> =
+                            GeckoResult.fromValue(
+                                if (
+                                    permission.permission ==
+                                        GeckoSession.PermissionDelegate.PERMISSION_AUTOPLAY_AUDIBLE ||
+                                    permission.permission ==
+                                        GeckoSession.PermissionDelegate.PERMISSION_AUTOPLAY_INAUDIBLE
+                                ) {
+                                    GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW
+                                } else {
+                                    GeckoSession.PermissionDelegate.ContentPermission.VALUE_PROMPT
+                                },
+                            )
+                    }
+                contentDelegate = object : GeckoSession.ContentDelegate {}
+                open(getGeckoRuntime())
+            }
+        browser.setSession(session)
+        session.loadUri(url)
         val button = Button(this).apply {
             text = getString(R.string.open_settings)
             alpha = SETTINGS_BUTTON_ALPHA
@@ -212,10 +227,22 @@ class MainActivity : ComponentActivity() {
                 marginEnd = SETTINGS_BUTTON_MARGIN_DP.dp
             },
         )
-        webView = browser
+        geckoView = browser
+        geckoSession = session
         settingsButton = button
         setContentView(container)
     }
+
+    private fun getGeckoRuntime(): GeckoRuntime =
+        geckoRuntime
+            ?: GeckoRuntime.create(
+                applicationContext,
+                GeckoRuntimeSettings.Builder()
+                    .allowInsecureConnections(GeckoRuntimeSettings.HTTPS_ONLY)
+                    .build(),
+            ).also {
+                geckoRuntime = it
+            }
 
     private fun showSettingsButton() {
         settingsButton?.apply {
@@ -253,8 +280,8 @@ class MainActivity : ComponentActivity() {
             networkLevel = newLevel
 
             if (shouldReload) {
-                Log.i(TAG, "Network became available; reloading WebView")
-                webView?.reload()
+                Log.i(TAG, "Network became available; reloading GeckoView")
+                geckoSession?.reload()
             }
         }
     }
@@ -281,6 +308,8 @@ class MainActivity : ComponentActivity() {
         const val SETTINGS_BUTTON_VISIBLE_MILLIS = 5_000L
         const val SETTINGS_BUTTON_ALPHA = 0.65f
         const val SETTINGS_BUTTON_MARGIN_DP = 24
+
+        var geckoRuntime: GeckoRuntime? = null
     }
 }
 
