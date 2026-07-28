@@ -10,18 +10,25 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -37,8 +44,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import dev.sogn.smartframe.ui.theme.FrameTheme
@@ -211,6 +222,7 @@ private class SettingsScreenActions(
     val onScreenOffTest: () -> Unit,
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SettingsScreen(
     initialConfig: FrameConfig,
@@ -222,9 +234,26 @@ private fun SettingsScreen(
     var startMinutes by rememberSaveable { mutableIntStateOf(initialConfig.startMinutes) }
     var endMinutes by rememberSaveable { mutableIntStateOf(initialConfig.endMinutes) }
     var localMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val isImeVisible = WindowInsets.isImeVisible
+    val dismissKeyboard = {
+        focusManager.clearFocus(force = true)
+        keyboardController?.hide()
+    }
+
+    BackHandler(enabled = isImeVisible) {
+        dismissKeyboard()
+    }
 
     FrameTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(focusManager, keyboardController) {
+                    detectTapGestures(onTap = { dismissKeyboard() })
+                },
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -246,6 +275,10 @@ private fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(androidx.compose.ui.res.stringResource(R.string.website_url)) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = { dismissKeyboard() },
+                    ),
                 )
 
                 HorizontalDivider()

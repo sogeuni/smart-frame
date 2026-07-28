@@ -36,7 +36,7 @@
             android:exported="false"
             android:label="@string/settings_app_name"
             android:theme="@style/Theme.Frame"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
 
         <receiver
             android:name=".ScreenOffAdminReceiver"

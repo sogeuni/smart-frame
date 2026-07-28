@@ -96,13 +96,6 @@ class MainActivity : ComponentActivity() {
 
         FrameScheduleManager.sync(this)
         showImmersiveMode()
-        if (!FrameScheduleManager.isDisplayTime(this)) {
-            window.decorView.post {
-                if (!isFinishing && !isDestroyed) {
-                    FrameScheduleManager.turnScreenOff(this)
-                }
-            }
-        }
     }
 
     override fun onStart() {

@@ -101,7 +101,7 @@ object FrameScheduleManager {
         }
         try {
             devicePolicyManager.lockNow()
-            Log.i(TAG, "End time reached; screen turned off")
+            Log.i(TAG, "Screen turned off for inactive display schedule")
         } catch (error: SecurityException) {
             Log.e(TAG, "Failed to turn screen off", error)
         }
