@@ -1,11 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory app:title="@string/website_section">
+    <PreferenceCategory app:title="@string/onedrive_section">
+        <Preference
+            app:key="onedrive_account"
+            app:summary="@string/onedrive_not_signed_in"
+            app:title="@string/onedrive_account" />
+
+        <Preference
+            app:key="onedrive_folder"
+            app:enabled="false"
+            app:summary="@string/onedrive_folder_not_selected"
+            app:title="@string/onedrive_folder" />
+
         <EditTextPreference
-            app:key="url"
-            app:dialogTitle="@string/website_url"
-            app:title="@string/website_url" />
+            app:key="photo_interval_seconds"
+            app:dialogTitle="@string/photo_interval"
+            app:title="@string/photo_interval" />
+
+        <EditTextPreference
+            app:key="poll_interval_minutes"
+            app:dialogTitle="@string/poll_interval"
+            app:title="@string/poll_interval" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/schedule_section">

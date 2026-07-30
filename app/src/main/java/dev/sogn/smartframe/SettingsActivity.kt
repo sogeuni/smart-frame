@@ -1,6 +1,7 @@
 package dev.sogn.smartframe
 
 import android.app.AlarmManager
+import android.app.AlertDialog
 import android.app.KeyguardManager
 import android.app.TimePickerDialog
 import android.app.admin.DevicePolicyManager
@@ -56,8 +57,19 @@ class SettingsActivity : FragmentActivity() {
             showMessage(R.string.required_permissions_missing)
             return
         }
-        startActivity(Intent(this, MainActivity::class.java))
-        finish()
+        OneDriveAuthManager.loadAccount(this) { result ->
+            result.fold(
+                onSuccess = { account ->
+                    if (account == null) {
+                        showMessage(R.string.onedrive_login_required)
+                    } else {
+                        startActivity(Intent(this, MainActivity::class.java))
+                        finish()
+                    }
+                },
+                onFailure = ::showError,
+            )
+        }
     }
 
     internal fun toggleDeviceAdmin() {
@@ -65,9 +77,7 @@ class SettingsActivity : FragmentActivity() {
         if (permissionState.deviceAdminActive) {
             devicePolicyManager.removeActiveAdmin(adminComponent)
             updateDeviceAdminSummary()
-            window.decorView.post {
-                SmartFrameScheduleManager.sync(this)
-            }
+            window.decorView.post { SmartFrameScheduleManager.sync(this) }
             return
         }
         startActivity(
@@ -138,6 +148,14 @@ class SettingsActivity : FragmentActivity() {
         Toast.makeText(this, messageResId, Toast.LENGTH_SHORT).show()
     }
 
+    internal fun showError(error: Throwable) {
+        Toast.makeText(
+            this,
+            getString(R.string.onedrive_error, error.message.orEmpty()),
+            Toast.LENGTH_LONG,
+        ).show()
+    }
+
     private fun updateDeviceAdminSummary() {
         (supportFragmentManager.findFragmentById(R.id.settings_container) as? SettingsFragment)
             ?.updateDeviceAdminSummary()
@@ -150,7 +168,10 @@ class SettingsActivity : FragmentActivity() {
 }
 
 class SettingsFragment : PreferenceFragmentCompat() {
-    private lateinit var urlPreference: EditTextPreference
+    private lateinit var accountPreference: Preference
+    private lateinit var folderPreference: Preference
+    private lateinit var photoIntervalPreference: EditTextPreference
+    private lateinit var pollIntervalPreference: EditTextPreference
     private lateinit var schedulePreference: SwitchPreferenceCompat
     private lateinit var startTimePreference: Preference
     private lateinit var endTimePreference: Preference
@@ -164,7 +185,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.preferences, rootKey)
 
-        urlPreference = requirePreference(SmartFramePreferences.KEY_URL)
+        accountPreference = requirePreference(SmartFramePreferences.KEY_ONEDRIVE_ACCOUNT)
+        folderPreference = requirePreference(SmartFramePreferences.KEY_ONEDRIVE_FOLDER)
+        photoIntervalPreference =
+            requirePreference(SmartFramePreferences.KEY_PHOTO_INTERVAL_SECONDS)
+        pollIntervalPreference =
+            requirePreference(SmartFramePreferences.KEY_POLL_INTERVAL_MINUTES)
         schedulePreference = requirePreference(SmartFramePreferences.KEY_SCHEDULE_ENABLED)
         startTimePreference = requirePreference(SmartFramePreferences.KEY_START_MINUTES)
         endTimePreference = requirePreference(SmartFramePreferences.KEY_END_MINUTES)
@@ -172,7 +198,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
         overlayPreference = requirePreference(KEY_OVERLAY)
         exactAlarmPreference = requirePreference(KEY_EXACT_ALARM)
 
-        bindUrlPreference()
+        bindOneDrivePreferences()
+        bindIntervalPreferences()
         bindSchedulePreference()
         bindTimePreferences()
         bindPermissionPreferences()
@@ -194,13 +221,44 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     internal fun refreshState() {
-        if (!this::urlPreference.isInitialized) return
-
+        if (!this::accountPreference.isInitialized) return
         val config = SmartFramePreferences.load(requireContext())
-        urlPreference.text = config.url
+        folderPreference.summary = config.oneDriveFolderName.ifBlank {
+            getString(R.string.onedrive_folder_not_selected)
+        }
+        photoIntervalPreference.text = config.photoIntervalSeconds.toString()
+        photoIntervalPreference.summary =
+            resources.getQuantityString(
+                R.plurals.seconds_value,
+                config.photoIntervalSeconds,
+                config.photoIntervalSeconds,
+            )
+        pollIntervalPreference.text = config.pollIntervalMinutes.toString()
+        pollIntervalPreference.summary =
+            resources.getQuantityString(
+                R.plurals.minutes_value,
+                config.pollIntervalMinutes,
+                config.pollIntervalMinutes,
+            )
         schedulePreference.isChecked = config.scheduleEnabled
         startTimePreference.summary = formatTime(config.startMinutes)
         endTimePreference.summary = formatTime(config.endMinutes)
+
+        OneDriveAuthManager.loadAccount(requireContext()) { result ->
+            if (!isAdded) return@loadAccount
+            result.fold(
+                onSuccess = { account ->
+                    val signedIn = account != null
+                    accountPreference.summary = account?.username
+                        ?: getString(R.string.onedrive_not_signed_in)
+                    folderPreference.isEnabled = signedIn
+                },
+                onFailure = { error ->
+                    accountPreference.summary = error.message
+                    folderPreference.isEnabled = false
+                },
+            )
+        }
 
         val permissionState = SmartFramePreferences.permissionState(requireContext())
         deviceAdminPreference.isEnabled = permissionState.deviceAdminSupported
@@ -218,24 +276,102 @@ class SettingsFragment : PreferenceFragmentCompat() {
         deviceAdminPreference.summary = permissionSummary(granted = false)
     }
 
-    private fun bindUrlPreference() {
-        urlPreference.isPersistent = false
-        urlPreference.summaryProvider = EditTextPreference.SimpleSummaryProvider.getInstance()
-        urlPreference.setOnBindEditTextListener { editText ->
-            editText.inputType =
-                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-            editText.setSelectAllOnFocus(false)
+    private fun bindOneDrivePreferences() {
+        accountPreference.setOnPreferenceClickListener {
+            OneDriveAuthManager.loadAccount(requireContext()) { result ->
+                result.fold(
+                    onSuccess = { account ->
+                        if (account == null) {
+                            OneDriveAuthManager.signIn(host) { signInResult ->
+                                signInResult.fold(
+                                    onSuccess = { refreshState() },
+                                    onFailure = host::showError,
+                                )
+                            }
+                        } else {
+                            confirmSignOut()
+                        }
+                    },
+                    onFailure = host::showError,
+                )
+            }
+            true
         }
-        urlPreference.setOnPreferenceChangeListener { _, newValue ->
-            val normalizedUrl = SmartFramePreferences.normalizeUrl(newValue as String)
-            if (normalizedUrl == null) {
-                host.showMessage(R.string.invalid_url)
+        folderPreference.setOnPreferenceClickListener {
+            OneDriveFolderPicker.show(host) { folder ->
+                val config = SmartFramePreferences.load(requireContext())
+                SmartFramePreferences.save(
+                    requireContext(),
+                    config.copy(
+                        oneDriveFolderId = folder.id,
+                        oneDriveFolderName = folder.name,
+                    ),
+                )
+                refreshState()
+            }
+            true
+        }
+    }
+
+    private fun confirmSignOut() {
+        AlertDialog.Builder(host)
+            .setTitle(R.string.onedrive_sign_out)
+            .setMessage(R.string.onedrive_sign_out_message)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.onedrive_sign_out) { _, _ ->
+                OneDriveAuthManager.signOut(requireContext()) { result ->
+                    result.fold(
+                        onSuccess = {
+                            SmartFramePreferences.clearOneDriveFolder(requireContext())
+                            refreshState()
+                        },
+                        onFailure = host::showError,
+                    )
+                }
+            }
+            .show()
+    }
+
+    private fun bindIntervalPreferences() {
+        bindNumberPreference(
+            preference = photoIntervalPreference,
+            min = 5,
+            max = 3_600,
+            invalidMessage = R.string.invalid_photo_interval,
+        ) { value, config ->
+            config.copy(photoIntervalSeconds = value)
+        }
+        bindNumberPreference(
+            preference = pollIntervalPreference,
+            min = 1,
+            max = 1_440,
+            invalidMessage = R.string.invalid_poll_interval,
+        ) { value, config ->
+            config.copy(pollIntervalMinutes = value)
+        }
+    }
+
+    private fun bindNumberPreference(
+        preference: EditTextPreference,
+        min: Int,
+        max: Int,
+        invalidMessage: Int,
+        update: (Int, SmartFrameConfig) -> SmartFrameConfig,
+    ) {
+        preference.isPersistent = false
+        preference.setOnBindEditTextListener { editText ->
+            editText.inputType = InputType.TYPE_CLASS_NUMBER
+            editText.setSelectAllOnFocus(true)
+        }
+        preference.setOnPreferenceChangeListener { _, newValue ->
+            val value = (newValue as String).toIntOrNull()
+            if (value == null || value !in min..max) {
+                host.showMessage(invalidMessage)
                 return@setOnPreferenceChangeListener false
             }
-
             val config = SmartFramePreferences.load(requireContext())
-            SmartFramePreferences.save(requireContext(), config.copy(url = normalizedUrl))
-            urlPreference.text = normalizedUrl
+            SmartFramePreferences.save(requireContext(), update(value, config))
+            refreshState()
             false
         }
     }
@@ -292,7 +428,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     host.showMessage(R.string.invalid_schedule)
                     return@TimePickerDialog
                 }
-
                 val updatedConfig = if (isStartTime) {
                     config.copy(startMinutes = selectedMinutes)
                 } else {
@@ -321,9 +456,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         String.format(Locale.getDefault(), "%02d:%02d", minutes / 60, minutes % 60)
 
     private inline fun <reified T : Preference> requirePreference(key: String): T =
-        requireNotNull(findPreference<T>(key)) {
-            "Missing preference: $key"
-        }
+        requireNotNull(findPreference<T>(key)) { "Missing preference: $key" }
 
     private companion object {
         const val KEY_DEVICE_ADMIN = "device_admin"
@@ -331,5 +464,52 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val KEY_EXACT_ALARM = "exact_alarm"
         const val KEY_SCREEN_OFF_TEST = "screen_off_test"
         const val KEY_OPEN_DISPLAY = "open_display"
+    }
+}
+
+private object OneDriveFolderPicker {
+    private data class Location(val folder: OneDriveFolder)
+
+    fun show(activity: SettingsActivity, onSelected: (OneDriveFolder) -> Unit) {
+        val stack = mutableListOf<Location>()
+        showLevel(activity, stack, onSelected)
+    }
+
+    private fun showLevel(
+        activity: SettingsActivity,
+        stack: MutableList<Location>,
+        onSelected: (OneDriveFolder) -> Unit,
+    ) {
+        val parent = stack.lastOrNull()?.folder
+        OneDriveGraphClient.listFolders(activity, parent?.id) { result ->
+            result.fold(
+                onSuccess = { folders ->
+                    val hasBack = stack.isNotEmpty()
+                    val labels = buildList {
+                        if (hasBack) add(activity.getString(R.string.parent_folder))
+                        addAll(folders.map { "📁 ${it.name}" })
+                    }
+                    val builder = AlertDialog.Builder(activity)
+                        .setTitle(parent?.name ?: activity.getString(R.string.onedrive_root))
+                        .setItems(labels.toTypedArray()) { _, index ->
+                            if (hasBack && index == 0) {
+                                stack.removeAt(stack.lastIndex)
+                            } else {
+                                val folderIndex = index - if (hasBack) 1 else 0
+                                stack += Location(folders[folderIndex])
+                            }
+                            showLevel(activity, stack, onSelected)
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                    if (parent != null) {
+                        builder.setPositiveButton(R.string.select_this_folder) { _, _ ->
+                            onSelected(parent)
+                        }
+                    }
+                    builder.show()
+                },
+                onFailure = activity::showError,
+            )
+        }
     }
 }

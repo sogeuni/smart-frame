@@ -1,0 +1,16 @@
+{
+  "client_id": "6e5e1959-6b3c-4074-8a08-384fa94c706e",
+  "redirect_uri": "msauth://dev.sogn.smartframe/eUjD1KbuBQUQQgGeu3yELWY9W9Q%3D",
+  "broker_redirect_uri_registered": true,
+  "account_mode": "SINGLE",
+  "authorities": [
+    {
+      "type": "AAD",
+      "audience": {
+        "type": "AzureADandPersonalMicrosoftAccount",
+        "tenant_id": "common"
+      },
+      "default": true
+    }
+  ]
+}

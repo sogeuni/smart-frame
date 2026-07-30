@@ -70,6 +70,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.preference.ktx)
+    implementation(libs.msal)
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.crashlytics)

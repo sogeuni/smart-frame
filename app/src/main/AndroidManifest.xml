@@ -38,6 +38,22 @@
             android:theme="@style/Theme.Frame.Settings"
             android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
 
+        <activity
+            android:name="com.microsoft.identity.client.BrowserTabActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="dev.sogn.smartframe"
+                    android:path="/eUjD1KbuBQUQQgGeu3yELWY9W9Q="
+                    android:scheme="msauth" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".ScreenOffAdminReceiver"
             android:description="@string/device_admin_description"
