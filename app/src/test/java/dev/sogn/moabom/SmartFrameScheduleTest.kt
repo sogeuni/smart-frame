@@ -1,4 +1,4 @@
-package dev.sogn.smartframe
+package dev.sogn.moabom
 
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -8,6 +8,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SmartFrameScheduleTest {
+    @Test
+    fun webViewRemainsTheDefaultDisplayMode() {
+        assertEquals(DisplayMode.WEBVIEW, SmartFrameConfig().displayMode)
+        assertEquals(DisplayMode.WEBVIEW, DisplayMode.fromPreference(null))
+        assertEquals(DisplayMode.WEBVIEW, DisplayMode.fromPreference("unknown"))
+        assertEquals(DisplayMode.IMAGE, DisplayMode.fromPreference("image"))
+        assertEquals(DisplayMode.WEBVIEW, DisplayMode.fromPreference("onedrive"))
+    }
+
     @Test
     fun scheduleIsDisabledByDefault() {
         assertFalse(SmartFrameConfig().scheduleEnabled)

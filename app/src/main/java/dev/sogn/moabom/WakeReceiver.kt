@@ -1,4 +1,4 @@
-package dev.sogn.smartframe
+package dev.sogn.moabom
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver

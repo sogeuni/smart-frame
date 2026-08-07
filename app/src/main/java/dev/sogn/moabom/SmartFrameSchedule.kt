@@ -1,4 +1,4 @@
-package dev.sogn.smartframe
+package dev.sogn.moabom
 
 import java.time.Instant
 import java.time.ZoneId

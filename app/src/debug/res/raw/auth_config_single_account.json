@@ -1,0 +1,15 @@
+{
+  "client_id" : "fe11d3ea-293b-4063-a60a-d305dc3a61fe",
+  "authorization_user_agent" : "DEFAULT",
+  "redirect_uri" : "msauth://dev.sogn.moabom/eUjD1KbuBQUQQgGeu3yELWY9W9Q%3D",
+  "account_mode" : "SINGLE",
+  "authorities" : [
+    {
+      "type": "AAD",
+      "audience": {
+        "type": "AzureADandPersonalMicrosoftAccount",
+        "tenant_id": "common"
+      }
+    }
+  ]
+}

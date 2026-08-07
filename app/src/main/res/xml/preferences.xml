@@ -1,11 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory app:title="@string/website_section">
+    <PreferenceCategory app:title="@string/content_source_section">
+        <ListPreference
+            app:defaultValue="webview"
+            app:entries="@array/display_mode_entries"
+            app:entryValues="@array/display_mode_values"
+            app:key="display_mode"
+            app:title="@string/display_mode" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="website_category"
+        app:title="@string/website_section">
         <EditTextPreference
             app:key="url"
             app:dialogTitle="@string/website_url"
             app:title="@string/website_url" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="onedrive_category"
+        app:title="@string/onedrive_section">
+        <Preference
+            app:key="onedrive_account"
+            app:summary="@string/onedrive_not_signed_in"
+            app:title="@string/onedrive_account" />
+
+        <Preference
+            app:key="onedrive_folder"
+            app:enabled="false"
+            app:summary="@string/onedrive_folder_not_selected"
+            app:title="@string/onedrive_folder" />
+
+        <EditTextPreference
+            app:key="photo_interval_seconds"
+            app:dialogTitle="@string/photo_interval"
+            app:title="@string/photo_interval" />
+
+        <EditTextPreference
+            app:key="poll_interval_minutes"
+            app:dialogTitle="@string/poll_interval"
+            app:title="@string/poll_interval" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/schedule_section">

@@ -1,10 +1,41 @@
 <resources>
-    <string name="app_name">Smart Frame</string>
-    <string name="settings_app_name">Smart Frame 설정</string>
-    <string name="settings_title">Smart Frame 설정</string>
+    <string name="app_name">모아봄</string>
+    <string name="settings_app_name">모아봄 설정</string>
+    <string name="settings_title">모아봄 설정</string>
     <string name="open_settings">설정</string>
+    <string name="refresh">새로고침</string>
+    <string name="content_source_section">콘텐츠 소스</string>
+    <string name="display_mode">표시 방식</string>
+    <string-array name="display_mode_entries">
+        <item>웹사이트(WebView)</item>
+        <item>이미지(ImageView)</item>
+    </string-array>
+    <string-array name="display_mode_values">
+        <item>webview</item>
+        <item>image</item>
+    </string-array>
     <string name="website_section">웹사이트</string>
     <string name="website_url">표시할 URL</string>
+    <string name="onedrive_section">OneDrive 사진</string>
+    <string name="onedrive_account">Microsoft 계정</string>
+    <string name="onedrive_not_signed_in">로그인하지 않았습니다. 눌러서 로그인하세요.</string>
+    <string name="onedrive_folder">사진 폴더</string>
+    <string name="onedrive_folder_not_selected">폴더를 선택하지 않았습니다</string>
+    <string name="onedrive_root">OneDrive</string>
+    <string name="parent_folder">↩ 상위 폴더</string>
+    <string name="select_this_folder">이 폴더 선택</string>
+    <string name="onedrive_sign_out">로그아웃</string>
+    <string name="onedrive_sign_out_message">Microsoft 계정에서 로그아웃하고 선택한 사진 폴더를 지울까요?</string>
+    <string name="photo_interval">사진 전환 주기(초)</string>
+    <string name="poll_interval">폴더 확인 주기(분)</string>
+    <plurals name="seconds_value">
+        <item quantity="other">%1$d초</item>
+    </plurals>
+    <plurals name="minutes_value">
+        <item quantity="other">%1$d분</item>
+    </plurals>
+    <string name="invalid_photo_interval">5~3600초 사이의 값을 입력하세요.</string>
+    <string name="invalid_poll_interval">1~1440분 사이의 값을 입력하세요.</string>
     <string name="schedule_section">표시 스케줄</string>
     <string name="schedule_enabled">표시 스케줄 사용</string>
     <string name="schedule_enabled_summary">설정한 시간에 화면을 자동으로 켜고 끕니다</string>
@@ -20,19 +51,32 @@
     <string name="disable_permission">해제</string>
     <string name="not_supported">지원하지 않음</string>
     <string name="save_settings">설정 저장</string>
-    <string name="open_frame_display">Smart Frame 화면 열기</string>
+    <string name="open_frame_display">MoaBom 화면 열기</string>
     <string name="display_section">화면</string>
-    <string name="open_frame_display_summary">설정한 웹사이트를 전체 화면으로 엽니다</string>
-    <string name="invalid_url">올바른 HTTPS URL을 입력하세요.</string>
+    <string name="open_frame_display_summary">설정한 콘텐츠를 전체 화면으로 엽니다</string>
+    <string name="invalid_url">올바른 HTTPS URL 또는 내부 IP의 HTTP URL을 입력하세요.</string>
     <string name="invalid_schedule">시작 시간과 종료 시간은 달라야 합니다.</string>
     <string name="settings_saved">설정을 저장했습니다.</string>
     <string name="required_permissions_missing">필수 권한을 모두 허용한 뒤 다시 시도하세요.</string>
     <string name="screen_test_permissions_missing">화면 끄기와 정확한 알람 권한이 필요합니다.</string>
-    <string name="device_admin_label">Smart Frame 화면 제어</string>
+    <string name="device_admin_label">모아봄 화면 제어</string>
     <string name="device_admin_description">테스트 버튼을 눌렀을 때 화면을 잠시 끄기 위해 사용합니다.</string>
     <string name="device_admin_explanation">10초 동안 화면을 끄는 테스트에 화면 잠금 권한이 필요합니다.</string>
     <string name="remove_screen_lock">안전한 테스트를 위해 먼저 PIN, 패턴 또는 비밀번호를 제거하세요.</string>
     <string name="turn_off_for_ten_seconds">화면꺼짐 테스트 (10초 후 켜짐)</string>
     <string name="screen_off_scheduled">Wake 알람을 등록했습니다. 화면을 끕니다.</string>
     <string name="screen_off_failed">화면 끄기 테스트에 실패했습니다: %1$s</string>
+    <string name="onedrive_not_configured">OneDrive 앱 등록이 설정되지 않았습니다. auth_config_single_account.json과 AndroidManifest.xml의 MSAL 리디렉션 설정을 수정하세요.</string>
+    <string name="onedrive_login_cancelled">Microsoft 로그인을 취소했습니다.</string>
+    <string name="onedrive_login_required">먼저 Microsoft 계정으로 로그인하세요.</string>
+    <string name="onedrive_token_failed">Microsoft Graph 액세스 토큰을 가져오지 못했습니다.</string>
+    <string name="onedrive_error">OneDrive 오류: %1$s</string>
+    <string name="onedrive_loading_photos">OneDrive에서 사진을 불러오는 중…</string>
+    <string name="onedrive_folder_has_no_photos">선택한 폴더에 지원되는 이미지가 없습니다.</string>
+    <string name="onedrive_photo_refresh_failed">OneDrive 폴더를 갱신하지 못했습니다.\n%1$s</string>
+    <string name="onedrive_photo_load_failed">사진을 불러오지 못했습니다. 잠시 후 다른 사진을 시도합니다.</string>
+    <string name="photo_source_loading">사진을 불러오는 중…</string>
+    <string name="photo_source_has_no_photos">선택한 이미지 원본에 지원되는 이미지가 없습니다.</string>
+    <string name="photo_source_refresh_failed">이미지 원본을 갱신하지 못했습니다.\n%1$s</string>
+    <string name="photo_source_load_failed">사진을 불러오지 못했습니다. 잠시 후 다른 사진을 시도합니다.</string>
 </resources>

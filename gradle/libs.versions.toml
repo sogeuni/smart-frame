@@ -1,13 +1,14 @@
 [versions]
 agp = "9.3.1"
 appcompat = "1.7.1"
-coreKtx = "1.18.0"
-firebaseBom = "34.16.0"
+coreKtx = "1.19.0"
+firebaseBom = "34.17.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
-lifecycleRuntimeKtx = "2.10.0"
+lifecycleRuntimeKtx = "2.11.0"
 preferenceKtx = "1.2.1"
+msal = "8.4.1"
 gms = "4.5.0"
 crashlytics = "3.0.7"
 
@@ -18,6 +19,7 @@ androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "j
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-preference-ktx = { module = "androidx.preference:preference-ktx", version.ref = "preferenceKtx" }
+msal = { module = "com.microsoft.identity.client:msal", version.ref = "msal" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }

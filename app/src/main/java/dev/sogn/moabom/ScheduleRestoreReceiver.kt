@@ -1,4 +1,4 @@
-package dev.sogn.smartframe
+package dev.sogn.moabom
 
 import android.content.BroadcastReceiver
 import android.content.Context

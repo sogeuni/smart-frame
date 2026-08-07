@@ -1,4 +1,4 @@
-package dev.sogn.smartframe
+package dev.sogn.moabom
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -10,8 +10,8 @@ import android.os.Build
 import android.util.Log
 
 object SmartFrameScheduleManager {
-    private const val ACTION_START = "dev.sogn.smartframe.action.SCHEDULE_START"
-    private const val ACTION_END = "dev.sogn.smartframe.action.SCHEDULE_END"
+    private const val ACTION_START = "dev.sogn.moabom.action.SCHEDULE_START"
+    private const val ACTION_END = "dev.sogn.moabom.action.SCHEDULE_END"
     private const val START_REQUEST_CODE = 2001
     private const val END_REQUEST_CODE = 2002
     private const val TAG = "SmartFrameSchedule"

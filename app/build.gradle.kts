@@ -20,7 +20,7 @@ fun keystoreProperty(name: String): String =
     }
 
 android {
-    namespace = "dev.sogn.smartframe"
+    namespace = "dev.sogn.moabom"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -28,7 +28,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "dev.sogn.smartframe"
+        applicationId = "dev.sogn.moabom"
         minSdk = 27
         targetSdk {
             version = release(36)
@@ -49,7 +49,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            manifestPlaceholders["msalRedirectPath"] = "/eUjD1KbuBQUQQgGeu3yELWY9W9Q="
+        }
+
         release {
+            manifestPlaceholders["msalRedirectPath"] = "/eE9s7dO0EApfopq6duvIbAoGqag="
+
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
@@ -70,6 +76,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.preference.ktx)
+    implementation(libs.msal)
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.crashlytics)
