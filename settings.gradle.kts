@@ -29,5 +29,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "smart-frame"
+rootProject.name = "MoaBom"
 include(":app")

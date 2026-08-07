@@ -22,7 +22,7 @@ fun keystoreProperty(name: String): String =
 android {
     namespace = "dev.sogn.moabom"
     compileSdk {
-        version = release(36) {
+        version = release(37) {
             minorApiLevel = 1
         }
     }
